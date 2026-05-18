@@ -141,6 +141,32 @@ class ToolExecutor:
                 "dividend_yield": _clean(info.get("dividendYield")),
                 "eps": _clean(info.get("trailingEps")),
             }
+            # Try to include ownership breakdown if available from repository or yfinance info
+            ownership = {}
+            try:
+                if hasattr(self.repository, 'get_ownership_breakdown'):
+                    ownership = self.repository.get_ownership_breakdown(ticker) or {}
+                else:
+                    insider = info.get('heldPercentInsiders')
+                    institutional = info.get('heldPercentInstitutions')
+                    if insider is not None or institutional is not None:
+                        try:
+                            insider_val = float(insider) if insider is not None else 0.0
+                            inst_val = float(institutional) if institutional is not None else 0.0
+                            retail_val = max(0.0, 1.0 - insider_val - inst_val)
+                            def _fmt(v):
+                                return f"{v * 100:.1f}%"
+                            ownership = {
+                                'institutional': _fmt(inst_val),
+                                'retail': _fmt(retail_val),
+                                'insider': _fmt(insider_val),
+                            }
+                        except Exception:
+                            ownership = {}
+            except Exception:
+                ownership = {}
+
+            result['ownership'] = ownership
             return json.dumps(result), label
         except Exception as e:
             return json.dumps({"error": str(e)}), label

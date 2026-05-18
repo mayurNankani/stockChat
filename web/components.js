@@ -4,7 +4,7 @@
  * Wrapped in alpine:init event to ensure Alpine is loaded
  */
 
-document.addEventListener('alpine:init', () => {
+function registerAlpineComponents() {
 
 // ===================================================================
 // Chat Interface Component
@@ -87,6 +87,11 @@ Alpine.data('chatInterface', () => ({
                 content: data.analysis_html,
                 isAnalysis: true,
                 toolUpdates: data.tool_updates
+            });
+            // Initialize collapsible sections after DOM update
+            this.$nextTick(() => {
+                try { initCollapsibles(); } catch (e) { console.warn('initCollapsibles failed', e); }
+                this.scrollToBottom();
             });
         }
         
@@ -219,8 +224,21 @@ Alpine.data('marketOverview', () => ({
         this.loading = true;
         try {
             this.data = await fetchMarketOverview();
+            // If the previously selected section is no longer available, clear it
             if (this.activeMarketSection && !this.getSectionItems(this.activeMarketSection).length) {
                 this.activeMarketSection = null;
+            }
+            // If no section is selected, default to the most informative one
+            if (!this.activeMarketSection) {
+                if ((this.mostActive || []).length) {
+                    this.activeMarketSection = 'most_active';
+                } else if ((this.gainers || []).length) {
+                    this.activeMarketSection = 'gainers';
+                } else if ((this.movers || []).length) {
+                    this.activeMarketSection = 'movers';
+                } else if ((this.losers || []).length) {
+                    this.activeMarketSection = 'losers';
+                }
             }
         } catch (err) {
             console.error('Error loading market overview:', err);
@@ -250,7 +268,50 @@ Alpine.data('marketOverview', () => ({
         if (!this.getSectionItems(section).length) {
             return;
         }
+        // Lock the document scroll during the DOM changes to eliminate any
+        // visual jump. This uses the common "body position:fixed" trick:
+        // capture the current scroll, fix body position, perform the toggle,
+        // then restore the scroll and body positioning after the transition.
+        const prevScroll = window.scrollY || window.pageYOffset || 0;
+        const prevActive = document.activeElement;
+        const prevBodyPosition = document.body.style.position || '';
+        const prevBodyTop = document.body.style.top || '';
+        const prevBodyWidth = document.body.style.width || '';
+
+        try {
+            document.body.classList.add('scroll-locked');
+            document.body.style.position = 'fixed';
+            document.body.style.left = '0';
+            document.body.style.top = `-${prevScroll}px`;
+            document.body.style.width = '100%';
+        } catch (e) {
+            // ignore
+        }
+
         this.activeMarketSection = this.activeMarketSection === section ? null : section;
+
+        const restoreDelay = 400; // match Alpine collapse timing
+        setTimeout(() => {
+            try {
+                document.body.classList.remove('scroll-locked');
+                document.body.style.position = prevBodyPosition;
+                document.body.style.left = '';
+                document.body.style.top = prevBodyTop;
+                document.body.style.width = prevBodyWidth;
+                window.scrollTo({ top: prevScroll, behavior: 'auto' });
+                if (prevActive && typeof prevActive.focus === 'function') {
+                    prevActive.focus({ preventScroll: true });
+                }
+            } catch (e) {
+                // ignore
+            }
+        }, restoreDelay);
+    },
+
+    closeOverlay() {
+        // Preserve API for buttons that call closeOverlay — simply collapse
+        this.activeMarketSection = null;
+        try { document.body.classList.remove('scroll-locked'); } catch (e) {}
     },
 
     isSectionActive(section) {
@@ -393,6 +454,41 @@ Alpine.data('stockModal', () => ({
         this.currentStock = item;
         this.isOpen = true;
         document.body.style.overflow = 'hidden';
+        // Enrich with ownership and other lightweight info
+        try {
+            fetch(`/api/stock-info?symbol=${encodeURIComponent(item.symbol)}`)
+                .then(r => {
+                    if (!r.ok) return null;
+                    return r.json();
+                })
+                .then(data => {
+                    if (!data) return;
+                    // Merge ownership into currentStock for modal display
+                    const ownership = (data && (data.ownership || (data.get && typeof data.get === 'function' && data.get('ownership')))) || null;
+                    if (ownership) {
+                        this.currentStock.ownership = ownership;
+                        return;
+                    }
+
+                    // If ownership is missing or all-null, do one retry after a short delay
+                    const allNull = ownership && Object.values(ownership).every(v => v === null);
+                    if (!ownership || allNull) {
+                        setTimeout(() => {
+                            fetch(`/api/stock-info?symbol=${encodeURIComponent(item.symbol)}`)
+                                .then(rr => rr.ok ? rr.json() : null)
+                                .then(d2 => {
+                                    if (!d2) return;
+                                    const o2 = d2.ownership || (d2.get && typeof d2.get === 'function' && d2.get('ownership')) || null;
+                                    if (o2) this.currentStock.ownership = o2;
+                                })
+                                .catch(() => {});
+                        }, 600);
+                    }
+                })
+                .catch(() => {});
+        } catch (e) {
+            // ignore enrichment errors
+        }
     },
     
     close() {
@@ -602,4 +698,29 @@ Alpine.data('scrollIndicator', () => ({
     }
 }));
 
-}); // End of alpine:init event listener
+} // End registerAlpineComponents
+
+if (window.Alpine && typeof window.Alpine.data === 'function') {
+    try {
+        registerAlpineComponents();
+    } catch (e) {
+        console.error('Failed to register Alpine components:', e);
+    }
+} else {
+    document.addEventListener('alpine:init', registerAlpineComponents);
+}
+
+// After registering components, re-initialize Alpine tree so elements using x-data callable factories
+// (e.g., those that were parsed earlier) are re-bound to the real implementations.
+function tryReinitAlpine() {
+    try {
+        if (window.Alpine && typeof window.Alpine.initTree === 'function') {
+            window.Alpine.initTree(document.body);
+        }
+    } catch (e) {
+        console.warn('Alpine re-init failed:', e);
+    }
+}
+
+// If Alpine is already present, schedule a re-init after a short delay to allow registration.
+setTimeout(tryReinitAlpine, 50);

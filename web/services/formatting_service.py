@@ -7,7 +7,7 @@ import os
 import re
 import time
 from datetime import datetime
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Any
 from src.tools.web_search import normalize_result_url
 
 
@@ -46,6 +46,167 @@ TECHNICAL_TOOLTIPS = {
 
 class FormattingService:
     """Utilities for formatting analysis data as HTML"""
+
+    def _format_ownership(self, ownership: dict) -> str:
+        # Always render an ownership section so the UI doesn't flicker
+        # when data is intermittently unavailable. Use 'N/A' for missing
+        # values to make flakiness visible but non-breaking.
+        if not isinstance(ownership, dict):
+            ownership = {}
+        inst = ownership.get('institutional')
+        retail = ownership.get('retail')
+        insider = ownership.get('insider')
+        return (
+            "<div class='ownership-section'><b>Ownership Breakdown:</b> "
+            f"Institutional: {inst if inst is not None else 'Ownership data unavailable'} | "
+            f"Retail: {retail if retail is not None else 'Ownership data unavailable'} | "
+            f"Insider: {insider if insider is not None else 'Ownership data unavailable'}"
+            "</div>"
+        )
+
+    def _format_insider(self, insiders: list) -> str:
+        if not insiders:
+            return ''
+        # Preview: show first 3 rows; expanded content shows up to 10
+        preview_list = insiders[:3]
+        remaining = insiders[3:10]
+
+        def _rows(items):
+            return ''.join(
+                f"<tr><td>{i.get('insider_name','')}</td><td>{i.get('relationship','')}</td><td>{i.get('transaction_type','')}</td>"
+                f"<td>{i.get('shares','')}</td><td>{i.get('date','')}</td><td>${float(i.get('price',0)):.2f}</td></tr>"
+                for i in items
+            )
+
+        preview_rows = _rows(preview_list)
+        more_rows = _rows(remaining) if remaining else ''
+
+        toggle_id = f"insider_toggle_{int(time.time() * 1000)}"
+        toggle_button = (
+            f"<button type='button' class='section-toggle' id='btn_{toggle_id}' "
+            f"onclick=\"var c=document.getElementById('{toggle_id}'); var b=document.getElementById('btn_{toggle_id}'); var show=c.style.display==='none'; c.style.display=show?'block':'none'; b.textContent=show?'Hide ▴':'Show more ▾';\">"
+            f"Show more ▾"
+            f"</button>"
+        )
+
+        header_html = (
+            f"<div style='display:flex;align-items:center;justify-content:space-between;gap:12px;'>"
+            f"<b>Recent Insider Transactions:</b>"
+            f"{toggle_button}"
+            f"</div>"
+        )
+
+        more_html = ''
+        if more_rows:
+            more_html = (
+                f"<div id='{toggle_id}' style='display:none;margin-top:0.5rem;'>"
+                f"<table class='insider-table'><tr><th>Name</th><th>Role</th><th>Type</th><th>Shares</th><th>Date</th><th>Price</th></tr>"
+                f"{preview_rows}{more_rows}</table>"
+                f"</div>"
+            )
+
+        # Always show the preview table; expanded content appends additional rows
+        return (
+            "<div class='insider-section'>"
+            f"{header_html}"
+            f"<table class='insider-table'><tr><th>Name</th><th>Role</th><th>Type</th><th>Shares</th><th>Date</th><th>Price</th></tr>"
+            f"{preview_rows}</table>"
+            f"{more_html}"
+            "</div>"
+        )
+
+    def _format_dividends(self, dividends: list) -> str:
+        if not dividends:
+            return ''
+        preview_list = dividends[:3]
+        remaining = dividends[3:10]
+
+        def _rows(items):
+            return ''.join(f"<tr><td>{d.get('date','')}</td><td>{d.get('amount','')}</td></tr>" for d in items)
+
+        preview_rows = _rows(preview_list)
+        more_rows = _rows(remaining) if remaining else ''
+
+        toggle_id = f"div_toggle_{int(time.time() * 1000)}"
+        toggle_button = (
+            f"<button type='button' class='section-toggle' id='btn_{toggle_id}' "
+            f"onclick=\"var c=document.getElementById('{toggle_id}'); var b=document.getElementById('btn_{toggle_id}'); var show=c.style.display==='none'; c.style.display=show?'block':'none'; b.textContent=show?'Hide ▴':'Show more ▾';\">"
+            f"Show more ▾"
+            f"</button>"
+        )
+
+        header_html = (
+            f"<div style='display:flex;align-items:center;justify-content:space-between;gap:12px;'>"
+            f"<b>Dividend History:</b>"
+            f"{toggle_button}"
+            f"</div>"
+        )
+
+        more_html = ''
+        if more_rows:
+            more_html = (
+                f"<div id='{toggle_id}' style='display:none;margin-top:0.5rem;'>"
+                f"<table class='dividend-table'><tr><th>Date</th><th>Amount</th></tr>"
+                f"{preview_rows}{more_rows}</table>"
+                f"</div>"
+            )
+
+        return (
+            "<div class='dividend-section'>"
+            f"{header_html}"
+            f"<table class='dividend-table'><tr><th>Date</th><th>Amount</th></tr>"
+            f"{preview_rows}</table>"
+            f"{more_html}"
+            "</div>"
+        )
+
+    def _format_peers(self, peers: list) -> str:
+        if not peers:
+            return ''
+        preview_list = peers[:3]
+        remaining = peers[3:10]
+
+        def _rows(items):
+            return ''.join(
+                f"<tr><td>{p.get('ticker','')}</td><td>{p.get('name','')}</td><td>{p.get('pe_ratio','')}</td><td>{p.get('market_cap','')}</td><td>{p.get('price','')}</td><td>{p.get('sector','')}</td></tr>"
+                for p in items
+            )
+
+        preview_rows = _rows(preview_list)
+        more_rows = _rows(remaining) if remaining else ''
+
+        toggle_id = f"peers_toggle_{int(time.time() * 1000)}"
+        toggle_button = (
+            f"<button type='button' class='section-toggle' id='btn_{toggle_id}' "
+            f"onclick=\"var c=document.getElementById('{toggle_id}'); var b=document.getElementById('btn_{toggle_id}'); var show=c.style.display==='none'; c.style.display=show?'block':'none'; b.textContent=show?'Hide ▴':'Show more ▾';\">"
+            f"Show more ▾"
+            f"</button>"
+        )
+
+        header_html = (
+            f"<div style='display:flex;align-items:center;justify-content:space-between;gap:12px;'>"
+            f"<b>Peer Comparison:</b>"
+            f"{toggle_button}"
+            f"</div>"
+        )
+
+        more_html = ''
+        if more_rows:
+            more_html = (
+                f"<div id='{toggle_id}' style='display:none;margin-top:0.5rem;'>"
+                f"<table class='peer-table'><tr><th>Ticker</th><th>Name</th><th>P/E</th><th>Market Cap</th><th>Price</th><th>Sector</th></tr>"
+                f"{preview_rows}{more_rows}</table>"
+                f"</div>"
+            )
+
+        return (
+            "<div class='peer-section'>"
+            f"{header_html}"
+            f"<table class='peer-table'><tr><th>Ticker</th><th>Name</th><th>P/E</th><th>Market Cap</th><th>Price</th><th>Sector</th></tr>"
+            f"{preview_rows}</table>"
+            f"{more_html}"
+            "</div>"
+        )
 
     @staticmethod
     def _clean_reason_summary(summary: str, section: str) -> str:
@@ -96,13 +257,13 @@ class FormattingService:
                 parsed['sentiment'] = value
 
         return parsed
-    
+
     @staticmethod
     def add_tooltips(text: str) -> str:
         """Add tooltip spans to technical terms"""
         all_keys = list(FUNDAMENTAL_TOOLTIPS.keys()) + list(TECHNICAL_TOOLTIPS.keys())
         all_keys.sort(key=len, reverse=True)
-        
+
         for key in all_keys:
             tooltip = FUNDAMENTAL_TOOLTIPS.get(key) or TECHNICAL_TOOLTIPS.get(key)
             text = re.sub(
@@ -112,14 +273,14 @@ class FormattingService:
                 flags=re.IGNORECASE
             )
         return text
-    
+
     @staticmethod
     def to_bullets(text: str) -> str:
         """Convert comma-separated text to HTML bullet list"""
         items = [item.strip() for item in text.split(',') if item.strip()]
         if not items:
             return ''
-        
+
         bullets = ''.join(f'<li>{item}</li>' for item in items)
         return f'<ul>{bullets}</ul>'
 
@@ -129,7 +290,6 @@ class FormattingService:
         raw = (text or '').strip()
         if not raw:
             return []
-        # Keep parsing lightweight and deterministic for UI output.
         pieces = re.split(r'\s*(?:,|;|\|)\s*', raw)
         return [p.strip() for p in pieces if p.strip()]
 
@@ -144,7 +304,7 @@ class FormattingService:
         if 'long-term' in t:
             return ['fundamental', 'technical', 'sentiment']
         return ['fundamental', 'technical', 'sentiment']
-    
+
     @staticmethod
     def heatmap(label: str) -> str:
         """Generate colored recommendation badge"""
@@ -164,11 +324,11 @@ class FormattingService:
         css_class = class_map.get(label, 'badge-na')
         icon = icon_map.get(label, '—')
         return f'<span class="badge {css_class}">{icon} {label}</span>'
-    
-    def expand_block(self, term: str, label: str, bar: str, bullets: str, idx: int, 
+
+    def expand_block(self, term: str, label: str, bar: str, bullets: str, idx: int,
                      fundamental_summary: str = None, technical_summary: str = None, sentiment_summary: str = None) -> str:
         """Create recommendation section with visible horizon reasons."""
-        
+
         section_data = {
             'fundamental': (fundamental_summary or '').strip(),
             'technical': (technical_summary or '').strip(),
@@ -181,7 +341,6 @@ class FormattingService:
             'sentiment': 2,
         }
 
-        # Preview reasons: show compact bullet points for each section.
         preview_blocks: List[str] = []
         for key in self._horizon_section_order(term):
             text = section_data.get(key, '')
@@ -192,11 +351,11 @@ class FormattingService:
             if not items:
                 continue
             trimmed_items = items[:section_item_limit.get(key, 3)]
-            bullets = ''.join(f'<li>{self.add_tooltips(item)}</li>' for item in trimmed_items)
+            bullets_html = ''.join(f'<li>{self.add_tooltips(item)}</li>' for item in trimmed_items)
             preview_blocks.append(
                 f'<div class="reason-preview reason-preview-{key}">'
                 f'<span class="reason-preview-label">{title}</span>'
-                f'<ul class="reason-preview-list">{bullets}</ul>'
+                f'<ul class="reason-preview-list">{bullets_html}</ul>'
                 f'</div>'
             )
 
@@ -205,16 +364,24 @@ class FormattingService:
         else:
             quick_html = f'<div class="reasons-body">{bullets}</div>'
 
-        return f'''
-        <div class="rec-row">
-            <div class="rec-main">
-                <div class="rec-label">{term}</div>
-                {quick_html}
-            </div>
-            {bar}
-        </div>
-        '''
-    
+        # Use a <details> element so the recommendation row is collapsed by default
+        # Summary shows the term and the heatmap badge; expanding reveals the reason preview.
+        summary_html = (
+            f"<div style=\"display:flex;align-items:center;gap:10px;justify-content:space-between;width:100%\">"
+            f"<div class=\"rec-label rec-label-collapsed\">{term}</div>"
+            f"<div style=\"margin-left:8px;\">{bar}</div>"
+            f"</div>"
+        )
+
+        return (
+            f"<div class=\"rec-row\">"
+            f"<details class=\"rec-row-details\">"
+            f"<summary>{summary_html}</summary>"
+            f"<div class=\"rec-details-body\">{quick_html}</div>"
+            f"</details>"
+            f"</div>"
+        )
+
     def format_analysis_html(self, analysis) -> str:
         """
         Format complete analysis as HTML
@@ -231,6 +398,10 @@ class FormattingService:
         recommendations = getattr(analysis, 'recommendations', {}) or {}
         news_result = getattr(analysis, 'news', {}) or {}
         price_history = getattr(analysis, 'price_history', {}) or {}
+        ownership = getattr(analysis, 'ownership', {}) or {}
+        insiders = getattr(analysis, 'insiders', []) or []
+        dividends = getattr(analysis, 'dividends', []) or []
+        peers = getattr(analysis, 'peers', []) or []
 
         display_name = self._safe_call(
             self._get_display_name,
@@ -250,11 +421,23 @@ class FormattingService:
             price_history,
             fallback='',
         )
-        news_html = self._safe_call(self._format_news, news_result, fallback='')
+        ownership_html = self._safe_call(self._format_ownership, ownership, fallback='')
+        insider_html = self._safe_call(self._format_insider, insiders, fallback='')
+        dividend_html = self._safe_call(self._format_dividends, dividends, fallback='')
+        peer_html = self._safe_call(self._format_peers, peers, fallback='')
         recommendations_html = self._safe_call(
             self._format_recommendations,
             recommendations,
             fallback='',
+        )
+        news_html = self._safe_call(self._format_news, news_result, fallback='')
+
+        # Single-column layout: header -> price/chart -> ownership/insider/dividend/peers -> recommendations -> news
+        primary_label = (
+            (recommendations.get('medium_term') or {}).get('label')
+            or (recommendations.get('short_term') or {}).get('label')
+            or (recommendations.get('long_term') or {}).get('label')
+            or 'N/A'
         )
 
         return (
@@ -265,9 +448,18 @@ class FormattingService:
             f"<div class='stock-name'>{display_name}<span class='stock-ticker-badge'>{ticker}</span></div>"
             f"<div class='stock-price-line'>{price_html}</div>"
             f"</div>"
+            f"<div style='margin-left:auto;display:flex;align-items:center;gap:8px;'>{self.heatmap(primary_label)}</div>"
             f"</div>"
+
             f"{price_chart_html}"
-            f"{recommendations_html}"
+            f"{ownership_html}"
+            f"{insider_html}"
+            f"{dividend_html}"
+            f"{peer_html}"
+
+            # Recommendations remain a first-class section so they visually match other blocks
+            f"<div class='rec-section-wrap' style='margin-top:0.9rem;'>{recommendations_html}</div>"
+
             f"{news_html}"
             f"</div>"
         )
@@ -357,31 +549,49 @@ class FormattingService:
         
         chart_id = f"chart_{ticker.replace('.', '_')}_{int(time.time() * 1000)}"
         
-        return f'''
-        <div class="perf-bar {perf_class}">
-            <span>
-                <b>30-Day:</b>
-                <span style="color:{change_color};font-weight:600;">
-                    {change_symbol}{overall_change_pct:.2f}% ({change_symbol}${overall_change:.2f})
-                </span>
-            </span>
-            <button class="toggle-chart-btn" data-chart-id="{chart_id}" data-ticker="{ticker}">
-                <span id="btn_{chart_id}">Chart</span>
-            </button>
-        </div>
-        <div id="{chart_id}" class="chart-container" style="display:none;">
-            <div style="display:flex;justify-content:center;margin-bottom:0.75rem;">
-                <div class="period-control">
-                    <button class="period-btn" data-period="1d" data-ticker="{ticker}" data-chart-id="{chart_id}">1D</button>
-                    <button class="period-btn" data-period="5d" data-ticker="{ticker}" data-chart-id="{chart_id}">5D</button>
-                    <button class="period-btn active" data-period="1mo" data-ticker="{ticker}" data-chart-id="{chart_id}">1M</button>
-                </div>
-            </div>
-            <canvas id="canvas_{chart_id}" style="width:100%;height:250px;"></canvas>
-            <div id="loading_{chart_id}" style="text-align:center;padding:20px;color:var(--text-3,#64748b);display:none;">Loading chart...</div>
-        </div>
-        '''
-    
+        # Build an inline onclick JS string without using f-string braces so Python doesn't interpret JS object braces.
+        onclick_js = (
+            "(function(cid,t){"
+            "var d=document.getElementById(cid);var b=document.getElementById('btn_'+cid);if(!d)return;"
+            "var hidden=d.style.display==='none'||d.style.display=='';"
+            "if(hidden){d.style.display='block';if(b)b.textContent='Hide Chart ▲';"
+            "var L=document.getElementById('loading_'+cid);var C=document.getElementById('canvas_'+cid);"
+            "if(L)L.style.display='block';if(C)C.style.display='none';"
+            "fetch('/api/price-history?ticker='+encodeURIComponent(t)+'&period=1mo').then(r=>r.json()).then(function(data){"
+            "try{var ctx=document.getElementById('canvas_'+cid).getContext('2d');document.getElementById('canvas_'+cid).height=250;"
+            "try{if(window._inlineCharts&&window._inlineCharts[cid]){window._inlineCharts[cid].destroy()}}catch(e){};"
+            "var canvas=document.getElementById('canvas_'+cid);try{canvas.style.display='block';canvas.width=(canvas.clientWidth||Math.floor((canvas.parentElement&&canvas.parentElement.getBoundingClientRect&&canvas.parentElement.getBoundingClientRect().width)||600));}catch(e){};canvas.height=250;"
+            "// sanitize response;"
+            "var safeDates = (data.dates||[]).map(function(d){return d==null? '' : String(d);});"
+            "var safePrices = (data.prices||[]).map(function(p){return p==null? null : Number(p);});"
+            "var ch=new Chart(ctx,{type:'line',data:{labels:safeDates,datasets:[{data:safePrices,borderColor:'#10b981',backgroundColor:'#10b98118',fill:true,pointRadius:0}]},options:{responsive:false,maintainAspectRatio:false,plugins:{tooltip:{mode:'index',intersect:false,callbacks:{title:function(items){try{return items&&items.length? (items[0].label||'') : ''; }catch(e){return '';}},label:function(ctx){try{var y=ctx.parsed&&ctx.parsed.y;return (y==null)?'' : '$' + Number(y).toFixed(2);}catch(e){return '';}}}}}});"
+            "window._inlineCharts=window._inlineCharts||{};window._inlineCharts[cid]=ch;}catch(e){console.error(e)}}).finally(function(){if(L)L.style.display='none';if(C)C.style.display='block'});"
+            "}else{d.style.display='none';if(b)b.textContent='Chart';}})('" + chart_id + "','" + ticker + "')"
+        )
+
+        return (
+            f"<div class=\"perf-bar {perf_class}\">"
+            f"<span>"
+            f"<b>30-Day:</b>"
+            f"<span style=\"color:{change_color};font-weight:600;\">{change_symbol}{overall_change_pct:.2f}% ({change_symbol}${overall_change:.2f})</span>"
+            f"</span>"
+            f"<button class=\"toggle-chart-btn\" data-chart-id=\"{chart_id}\" data-ticker=\"{ticker}\" onclick=\"{onclick_js}\">"
+            f"<span id=\"btn_{chart_id}\">Chart</span>"
+            f"</button>"
+            f"</div>"
+            f"<div id=\"{chart_id}\" class=\"chart-container\" style=\"display:none;\">"
+            f"<div style=\"display:flex;justify-content:center;margin-bottom:0.75rem;\">"
+            f"<div class=\"period-control\">"
+            f"<button class=\"period-btn\" data-period=\"1d\" data-ticker=\"{ticker}\" data-chart-id=\"{chart_id}\">1D</button>"
+            f"<button class=\"period-btn\" data-period=\"5d\" data-ticker=\"{ticker}\" data-chart-id=\"{chart_id}\">5D</button>"
+            f"<button class=\"period-btn active\" data-period=\"1mo\" data-ticker=\"{ticker}\" data-chart-id=\"{chart_id}\">1M</button>"
+            f"</div>"
+            f"</div>"
+            f"<canvas id=\"canvas_{chart_id}\" style=\"width:100%;height:250px;\"></canvas>"
+            f"<div id=\"loading_{chart_id}\" style=\"text-align:center;padding:20px;color:var(--text-3,#64748b);display:none;\">Loading chart...</div>"
+            f"</div>"
+        )
+
     def _format_news(self, news_result: Dict[str, Any]) -> str:
         """Format news section"""
         articles = []
@@ -409,29 +619,37 @@ class FormattingService:
                 for item in items
             )
 
-        top_articles = valid_articles[:5]
-        remaining_articles = valid_articles[5:]
+        # Render news inside a collapsible section that matches other card blocks
+        # Show up to 10 articles when expanded
+        top_articles = valid_articles[:10]
         top_items_html = _render_cards(top_articles)
 
-        more_html = ''
-        if remaining_articles:
-            remaining_count = len(remaining_articles)
-            remaining_items_html = _render_cards(remaining_articles)
-            more_html = (
-                f"<div class='news-more-wrap'>"
-                f"<div class='news-more-content' style='display:none;'>{remaining_items_html}</div>"
-                f"<button type='button' class='news-more-btn' "
-                f"onclick=\"const content=this.previousElementSibling; const show=content.style.display==='none'; content.style.display=show?'block':'none'; this.textContent=show?'Hide extra news':'View all news ({remaining_count})';\">"
-                f"View all news ({remaining_count})"
-                f"</button>"
-                f"</div>"
-            )
+        toggle_id = f"news_toggle_{int(time.time() * 1000)}"
+
+        # Button shows/hides the whole news content (keeps inline-js simple to avoid f-string braces)
+        toggle_button = (
+            f"<button type='button' class='section-toggle' id='btn_{toggle_id}' "
+            f"onclick=\"var c=document.getElementById('{toggle_id}'); var b=document.getElementById('btn_{toggle_id}'); var show=c.style.display==='none'; c.style.display=show?'block':'none'; b.textContent=show?'Hide ▴':'Show more ▾';\">"
+            f"Show more ▾"
+            f"</button>"
+        )
+
+        header_html = (
+            f"<div style='display:flex;align-items:center;justify-content:space-between;gap:12px;'>"
+            f"<b>Recent News</b>"
+            f"{toggle_button}"
+            f"</div>"
+        )
 
         return (
-            f'<div class="news-section-title">Recent News</div>'
-            f'<div>{top_items_html}{more_html}</div>'
+            f"<div class='news-section'>"
+            f"{header_html}"
+            f"<div id='{toggle_id}' style='display:none;margin-top:0.6rem;' class='news-full-content'>"
+            f"{top_items_html}"
+            f"</div>"
+            f"</div>"
         )
-    
+
     def _format_recommendations(self, recommendations: Dict[str, Any]) -> str:
         """Format recommendations section"""
         if not isinstance(recommendations, dict):
@@ -532,21 +750,46 @@ class FormattingService:
                 sentiment_summary=long_sentiment  # Only show if explicitly in long-term summary (not fallback)
             )
         ]
-        
+
         risk_note = (
             "<div class='horizon-risk-note'>"
             "Signals can change quickly after earnings releases, guidance updates, and macro shocks."
             "</div>"
         )
 
+        # No preview text when collapsed — only the section title and the Show more toggle
+        preview_html = ''
+
+        full_html = ''.join(blocks)
+
+        toggle_id = f"rec_toggle_{int(time.time() * 1000)}"
+
+        # Use a simple inline JS toggle without braces to avoid f-string escaping pitfalls
+        # Use the same small 'Show more' style as other sections and a down-arrow
+        toggle_button = (
+            f"<button type='button' class='section-toggle' id='btn_{toggle_id}' "
+            f"onclick=\"var c=document.getElementById('{toggle_id}'); var b=document.getElementById('btn_{toggle_id}'); var show=c.style.display==='none'; c.style.display=show?'block':'none'; b.textContent=show?'Hide ▴':'Show more ▾';\">"
+            f"Show more ▾"
+            f"</button>"
+        )
+
+        header_html = (
+            f"<div style='display:flex;align-items:center;justify-content:space-between;gap:12px;'>"
+            f"<div class='rec-section-title'>Time Horizon Recommendations</div>"
+            f"{toggle_button}"
+            f"</div>"
+        )
+
         return (
             "<div class='rec-section'>"
-            "<div class='rec-section-title'>Time Horizon Recommendations</div>"
-            f"{''.join(blocks)}"
+            f"{header_html}"
+            f"<div id='{toggle_id}' style='display:none;margin-top:0.6rem;' class='rec-full-content'>"
+            f"{full_html}"
             f"{risk_note}"
+            f"</div>"
             "</div>"
         )
-    
+
     @staticmethod
     def format_earnings_html(ticker: str, data: Dict) -> str:
         """Format earnings data as HTML table"""
@@ -690,6 +933,14 @@ class FormattingService:
         if isinstance(price, (int, float)):
             price_text = f"${price:,.2f} {currency}"
 
+        ownership = result_data.get("ownership", {})
+        ownership_html = ""
+        if ownership and 'institutional' in ownership:
+            inst = ownership.get('institutional', 'N/A')
+            retail = ownership.get('retail', 'N/A')
+            insider = ownership.get('insider', 'N/A')
+            ownership_html = f"<div class='ownership-section' style='margin-bottom:10px;'><b>Ownership Breakdown:</b> Institutional: {inst} | Retail: {retail} | Insider: {insider}</div>"
+
         return (
             f"<div class='analysis-block stock-card' data-ticker='{ticker}'>"
             f"<div class='stock-card-header'>"
@@ -698,6 +949,7 @@ class FormattingService:
             f"<div class='stock-price-line'>{price_text}</div>"
             f"</div>"
             f"</div>"
+            f"{ownership_html}"
             f"<div class='rec-section'>"
             f"<div class='rec-section-title'>Time Horizon Recommendations</div>"
             f"{_row('Short-term (1 week)', recs.get('short_term', {}) or {})}"
@@ -727,8 +979,12 @@ class FormattingService:
                 }
             }
             analysis.recommendations = result_data.get("recommendations", {}) or {}
-            analysis.news = {"news": []}
-            analysis.price_history = {"dates": [], "prices": []}
+            analysis.news = result_data.get("news", {"news": []})
+            analysis.price_history = result_data.get("price_history", {"dates": [], "prices": []})
+            analysis.ownership = result_data.get("ownership", {}) or {}
+            analysis.insiders = result_data.get("insiders", []) or []
+            analysis.dividends = result_data.get("dividends", []) or []
+            analysis.peers = result_data.get("peers", []) or []
 
             rendered = self.format_analysis_html(analysis)
             if rendered and "badge-" in rendered and "rec-section-title" in rendered:
@@ -754,25 +1010,15 @@ class FormattingService:
             if not url or url in seen:
                 continue
             seen.add(url)
-            unique.append({**item, "url": url})
+            title = (item.get('title') or item.get('headline') or url)
+            unique.append({"url": url, "title": title})
 
         if not unique:
             return reply
 
-        links = []
-        for item in unique[:5]:
-            title = item.get("title", "Source")
-            source = item.get("source", "Source")
-            url = item.get("url", "#")
-            links.append(
-                f"<li><a href=\"{url}\" target=\"_blank\" rel=\"noopener\">{title}</a> "
-                f"<span style='color:#94a3b8;'>({source})</span></li>"
-            )
+        parts = ['<div class="citations"><b>Sources:</b><ul>']
+        for u in unique:
+            parts.append(f'<li><a href="{u["url"]}" target="_blank" rel="noopener">{u["title"]}</a></li>')
+        parts.append('</ul></div>')
 
-        citations_html = "<br><br><b>Sources:</b><ul>" + "".join(links) + "</ul>"
-        body = (reply or "").strip()
-        if not body:
-            return citations_html
-        if "<b>Sources:</b>" in body:
-            return body
-        return body + citations_html
+        return reply + ''.join(parts)

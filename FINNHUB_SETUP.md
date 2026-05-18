@@ -1,5 +1,7 @@
 # Finnhub News Setup
 
+Last updated: 2026-05-17 — Commit-ready
+
 ## Current status
 Finnhub is the live news source used by `FinnhubNewsAdapter` and surfaced in the analysis card through `FormattingService`.
 

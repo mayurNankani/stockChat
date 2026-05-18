@@ -1,5 +1,7 @@
 # FinBERT Sentiment Setup
 
+Last updated: 2026-05-17 — Commit-ready
+
 ## Current status
 FinBERT is used through `FinbertSentimentAdapter`. The model is loaded once per process and reused, so sentiment scoring no longer reloads the weights on every request.
 

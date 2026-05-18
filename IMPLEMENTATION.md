@@ -1,5 +1,7 @@
 # tickerTalk — Implementation Guide
 
+Last updated: 2026-05-17 — Commit-ready
+
 ## Request flow
 1. The browser posts `history` and `model` to `/chat`.
 2. `AgentService` builds the system prompt and adds a ticker hint.

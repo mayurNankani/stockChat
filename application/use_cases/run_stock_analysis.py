@@ -31,12 +31,14 @@ class StockAnalysisUseCase:
         news_adapter: NewsAdapter,
         sentiment_adapter: SentimentAdapter,
         company_lookup: CompanyLookupAdapter,
+        repository=None,
         legacy_agent: Optional[StockAnalysisAgentImproved] = None,
     ) -> None:
         self.market_data = market_data
         self.news_adapter = news_adapter
         self.sentiment_adapter = sentiment_adapter
         self.company_lookup = company_lookup
+        self.repository = repository
         self.legacy_agent = legacy_agent or StockAnalysisAgentImproved()
 
     def resolve_symbol(self, query: str) -> Optional[str]:
@@ -109,6 +111,18 @@ class StockAnalysisUseCase:
             sentiment_score=comp_scores.sentiment,
         )
 
+        # Fetch new data for card sections
+        if self.repository:
+            ownership = self.repository.get_ownership_breakdown(symbol) if hasattr(self.repository, 'get_ownership_breakdown') else {}
+            insiders = self.repository.get_insider_transactions(symbol) if hasattr(self.repository, 'get_insider_transactions') else []
+            dividends = self.repository.get_dividend_history(symbol) if hasattr(self.repository, 'get_dividend_history') else []
+            peers = self.repository.get_peer_comparison(symbol) if hasattr(self.repository, 'get_peer_comparison') else []
+        else:
+            ownership = self.market_data.get_ownership_breakdown(symbol) if hasattr(self.market_data, 'get_ownership_breakdown') else {}
+            insiders = self.market_data.get_insider_transactions(symbol) if hasattr(self.market_data, 'get_insider_transactions') else []
+            dividends = self.market_data.get_dividend_history(symbol) if hasattr(self.market_data, 'get_dividend_history') else []
+            peers = self.market_data.get_peer_comparison(symbol) if hasattr(self.market_data, 'get_peer_comparison') else []
+
         # Presentation dict (still used by existing formatting service)
         presentation = {
             "ticker": symbol,
@@ -124,6 +138,10 @@ class StockAnalysisUseCase:
                 "technical": technical,
                 "sentiment": sentiment,
             },
+            "ownership": ownership,
+            "insiders": insiders,
+            "dividends": dividends,
+            "peers": peers,
         }
         return presentation
 

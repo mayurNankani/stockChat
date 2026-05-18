@@ -143,6 +143,10 @@ class StockAnalysis:
     recommendations: Dict[str, Any]
     news: Dict[str, Any]
     price_history: Dict[str, Any]
+    ownership: Dict[str, Any] = None
+    insiders: list = None
+    dividends: list = None
+    peers: list = None
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary"""
@@ -152,5 +156,9 @@ class StockAnalysis:
             'quote': self.quote,
             'recommendations': self.recommendations,
             'news': self.news,
-            'price_history': self.price_history
+            'price_history': self.price_history,
+            'ownership': self.ownership,
+            'insiders': self.insiders,
+            'dividends': self.dividends,
+            'peers': self.peers
         }

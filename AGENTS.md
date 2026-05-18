@@ -1,5 +1,7 @@
 # AGENTS.md — Contributor & AI Agent Guide
 
+Last updated: 2026-05-17 — Commit-ready
+
 This file describes the project structure, agent roles, key conventions, and important rules for human contributors and AI coding agents working on this codebase.
 
 ---

@@ -9,10 +9,10 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="/static/style.css?v=2">
 </head>
-<body @keydown.escape.window="/* handled by chat component */">
-    <header x-data="themeToggle">
+<body>
+    <header x-data="themeToggle()">
         <div class="header-left">
             <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
@@ -28,7 +28,7 @@
     </header>
 
     <!-- Chat Interface Container - shared state for main and bottom-bar -->
-    <div x-data="chatInterface">
+    <div x-data="chatInterface()">
     <main @keydown.escape.window="handleKeydown($event)">
         <div class="chat-area">
             <!-- Empty State -->
@@ -50,7 +50,7 @@
             </div>
 
             <!-- Market Overview Sections -->
-            <div class="market-overview" x-data="marketOverview">
+            <div class="market-overview" x-data="marketOverview()">
                 <template x-if="hasData">
                     <div>
                         <!-- Market Summary -->
@@ -59,7 +59,7 @@
                                 <div class="market-summary-header">
                                     <div>
                                         <div class="market-summary-kicker" x-text="marketSummary.marketOpen ? 'Live session summary' : 'Today on the market'"></div>
-                                        <div class="market-summary-title" x-text="'The market is trading ' + marketSummary.trendLabel + (marketSummary.marketOpen ? ' right now.' : ' the day.')"></div>
+                                        <div class="market-summary-title" x-text="'The market is trading ' + marketSummary.trendLabel + (marketSummary.marketOpen ? ' right now.' : ' today.')"></div>
                                     </div>
                                     <div class="market-summary-badge" x-text="marketSummary.marketOpen ? 'Market Open' : 'Market Closed'"></div>
                                 </div>
@@ -67,30 +67,36 @@
                                 <!-- Index Buttons -->
                                 <div class="market-summary-actions">
                                     <template x-for="index in marketSummary.indices" :key="index.symbol">
-                                        <button type="button" 
+                                            <button type="button" 
                                                 class="market-summary-btn"
                                                 :class="index.change_percent >= 0 ? 'positive' : 'negative'"
-                                                @click="$dispatch('open-modal', index)"
+                                                @mousedown.prevent
+                                                @click.stop="$dispatch('open-modal', index)"
+                                                @focus="$el.blur()"
                                                 x-text="prettyIndexName(index.symbol) + ' ' + formatSignedPercent(index.change_percent)">
-                                        </button>
+                                            </button>
                                     </template>
                                     
                                     <!-- Top Mover -->
                                     <template x-if="marketSummary.leadingMover">
                                         <button type="button"
-                                                class="market-summary-btn"
-                                                :class="marketSummary.leadingMover.change_percent >= 0 ? 'positive' : 'negative'"
-                                                @click="$dispatch('open-modal', marketSummary.leadingMover)"
-                                                x-text="'Top mover: ' + marketSummary.leadingMover.symbol + ' ' + formatSignedPercent(marketSummary.leadingMover.change_percent)">
+                                            class="market-summary-btn"
+                                            :class="marketSummary.leadingMover.change_percent >= 0 ? 'positive' : 'negative'"
+                                                @mousedown.prevent
+                                                    @click.stop="$dispatch('open-modal', marketSummary.leadingMover)"
+                                                    @focus="$el.blur()"
+                                            x-text="'Top mover: ' + marketSummary.leadingMover.symbol + ' ' + formatSignedPercent(marketSummary.leadingMover.change_percent)">
                                         </button>
                                     </template>
                                     
                                     <!-- Top Loser -->
                                     <template x-if="marketSummary.leadingLoser">
                                         <button type="button"
-                                                class="market-summary-btn negative"
-                                                @click="$dispatch('open-modal', marketSummary.leadingLoser)"
-                                                x-text="'Top loser: ' + marketSummary.leadingLoser.symbol + ' ' + formatSignedPercent(marketSummary.leadingLoser.change_percent)">
+                                            class="market-summary-btn negative"
+                                                @mousedown.prevent
+                                                @click.stop="$dispatch('open-modal', marketSummary.leadingLoser)"
+                                                @focus="$el.blur()"
+                                            x-text="'Top loser: ' + marketSummary.leadingLoser.symbol + ' ' + formatSignedPercent(marketSummary.leadingLoser.change_percent)">
                                         </button>
                                     </template>
                                 </div>
@@ -105,9 +111,11 @@
                         <div class="market-toggle-row">
                             <template x-if="mostActive.length > 0">
                                 <button type="button"
-                                        class="market-section-toggle"
-                                        @click="toggleSection('most_active')"
-                                        :class="{ 'active': isSectionActive('most_active') }">
+                                    class="market-section-toggle"
+                                        @mousedown.prevent
+                                        @click.stop="toggleSection('most_active')"
+                                        @focus="$el.blur()"
+                                    :class="{ 'active': isSectionActive('most_active') }">
                                     <span>Most Active</span>
                                     <span x-text="isSectionActive('most_active') ? '▼' : '▶'"></span>
                                 </button>
@@ -115,9 +123,11 @@
 
                             <template x-if="gainers.length > 0">
                                 <button type="button"
-                                        class="market-section-toggle"
-                                        @click="toggleSection('gainers')"
-                                        :class="{ 'active': isSectionActive('gainers') }">
+                                    class="market-section-toggle"
+                                        @mousedown.prevent
+                                        @click.stop="toggleSection('gainers')"
+                                        @focus="$el.blur()"
+                                    :class="{ 'active': isSectionActive('gainers') }">
                                     <span>Top Gainers</span>
                                     <span x-text="isSectionActive('gainers') ? '▼' : '▶'"></span>
                                 </button>
@@ -125,9 +135,11 @@
 
                             <template x-if="movers.length > 0">
                                 <button type="button"
-                                        class="market-section-toggle"
-                                        @click="toggleSection('movers')"
-                                        :class="{ 'active': isSectionActive('movers') }">
+                                    class="market-section-toggle"
+                                        @mousedown.prevent
+                                        @click.stop="toggleSection('movers')"
+                                        @focus="$el.blur()"
+                                    :class="{ 'active': isSectionActive('movers') }">
                                     <span>Top Movers</span>
                                     <span x-text="isSectionActive('movers') ? '▼' : '▶'"></span>
                                 </button>
@@ -135,25 +147,29 @@
 
                             <template x-if="losers.length > 0">
                                 <button type="button"
-                                        class="market-section-toggle"
-                                        @click="toggleSection('losers')"
-                                        :class="{ 'active': isSectionActive('losers') }">
+                                    class="market-section-toggle"
+                                        @mousedown.prevent
+                                        @click.stop="toggleSection('losers')"
+                                        @focus="$el.blur()"
+                                    :class="{ 'active': isSectionActive('losers') }">
                                     <span>Top Losers</span>
                                     <span x-text="isSectionActive('losers') ? '▼' : '▶'"></span>
                                 </button>
                             </template>
                         </div>
-
-                        <div class="market-selected-row" x-show="activeMarketSection" x-collapse>
-                            <div class="card-carousel">
-                                <template x-for="item in activeSectionItems" :key="item.symbol + '-' + activeMarketSection">
-                                    <div class="market-card"
-                                         :data-symbol="item.symbol"
-                                         @click="$dispatch('open-modal', item)"
-                                         x-html="formatCardHTML(item, activeSectionShowVolume)"></div>
-                                </template>
+                        
+                        <!-- Overlay rendering for expanded market section (avoids page reflow) -->
+                            <!-- Inline expanded row (accordion) with carousel — preserves page flow -->
+                            <div class="market-selected-row" x-show="activeMarketSection" x-collapse>
+                                <div class="card-carousel">
+                                    <template x-for="item in activeSectionItems" :key="item.symbol + '-' + activeMarketSection">
+                                        <div class="market-card"
+                                             :data-symbol="item.symbol"
+                                             @click.stop="$dispatch('open-modal', item)"
+                                             x-html="formatCardHTML(item, activeSectionShowVolume)"></div>
+                                    </template>
+                                </div>
                             </div>
-                        </div>
                     </div>
                 </template>
             </div>
@@ -188,8 +204,8 @@
         </div>
 
         <!-- Quick Preview Modal -->
-        <div class="modal" 
-             x-data="stockModal" 
+           <div class="modal" 
+               x-data="stockModal()" 
              :class="{ 'active': isOpen }"
              @click.self="close()"
              @open-modal.window="open($event.detail)">
@@ -235,6 +251,24 @@
                     </div>
                 </div>
 
+                <div x-show="stock.ownership" class="modal-ownership" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(148, 163, 184, 0.08);">
+                    <div class="modal-detail-label" style="margin-bottom: 10px;">Ownership</div>
+                    <div class="ownership-grid">
+                        <div class="ownership-badge">
+                            <div class="ownership-label">Institutional</div>
+                            <div class="ownership-value" :class="{ 'ownership-unavailable': !(stock.ownership && stock.ownership.institutional) || stock.ownership.institutional === 'N/A' || stock.ownership.institutional === 'Ownership data unavailable' }" x-text="stock.ownership && stock.ownership.institutional ? stock.ownership.institutional : 'Ownership data unavailable'"></div>
+                        </div>
+                        <div class="ownership-badge">
+                            <div class="ownership-label">Retail</div>
+                            <div class="ownership-value" :class="{ 'ownership-unavailable': !(stock.ownership && stock.ownership.retail) || stock.ownership.retail === 'N/A' || stock.ownership.retail === 'Ownership data unavailable' }" x-text="stock.ownership && stock.ownership.retail ? stock.ownership.retail : 'Ownership data unavailable'"></div>
+                        </div>
+                        <div class="ownership-badge">
+                            <div class="ownership-label">Insider</div>
+                            <div class="ownership-value" :class="{ 'ownership-unavailable': !(stock.ownership && stock.ownership.insider) || stock.ownership.insider === 'N/A' || stock.ownership.insider === 'Ownership data unavailable' }" x-text="stock.ownership && stock.ownership.insider ? stock.ownership.insider : 'Ownership data unavailable'"></div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="modal-actions">
                     <button class="modal-btn primary" @click="analyze()">Analyze</button>
                     <button class="modal-btn secondary" @click="close()">Cancel</button>
@@ -243,7 +277,7 @@
         </div>
     </main>
 
-    <div x-data="scrollIndicator" 
+    <div x-data="scrollIndicator()" 
          id="scrollIndicator" 
          x-show="visible"
          @click="scrollToBottom()"
@@ -302,14 +336,22 @@
     </div>
     </div> <!-- End chat interface container -->
 
-    <!-- Application Scripts - Load BEFORE Alpine -->
-    <script src="utils.js"></script>
-    <script src="services.js"></script>
-    <script src="components.js"></script>
-    <script src="main.js"></script>
-    
-    <!-- Alpine.js - Load LAST with defer -->
-    <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/collapse@3.x.x/dist/cdn.min.js"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <!-- Application Scripts -->
+    <!-- Temporary placeholders to avoid Alpine x-data errors during initial parse -->
+    <script>
+        window.themeToggle = window.themeToggle || function(){ return {}; };
+        window.chatInterface = window.chatInterface || function(){ return {}; };
+        window.marketOverview = window.marketOverview || function(){ return {}; };
+        window.stockModal = window.stockModal || function(){ return {}; };
+        window.scrollIndicator = window.scrollIndicator || function(){ return {}; };
+    </script>
+    <script src="/static/utils.js?v=2"></script>
+    <script src="/static/services.js?v=2"></script>
+    <script src="/static/components.js?v=2"></script>
+    <script src="/static/main.js?v=2"></script>
+
+    <!-- Alpine.js and plugins -->
+    <script src="https://cdn.jsdelivr.net/npm/@alpinejs/collapse@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 </body>
 </html>

@@ -65,11 +65,16 @@ async function validateTickerSymbol(symbol) {
 // ===================================================================
 
 async function fetchMarketOverview() {
-    const response = await fetch('/api/market-overview');
-    
-    if (!response.ok) {
-        throw new Error('Failed to fetch market overview');
+    try {
+        const cacheSeconds = 120;
+        const response = await fetch(`/api/market-overview?cache_seconds=${cacheSeconds}`);
+        if (!response.ok) {
+            console.warn('Market overview fetch failed:', response.status);
+            return null;
+        }
+        return await response.json();
+    } catch (err) {
+        console.warn('Market overview fetch error:', err);
+        return null;
     }
-    
-    return response.json();
 }
