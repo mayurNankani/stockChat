@@ -68,3 +68,30 @@ class YahooFinanceAdapter(MarketDataAdapter):
             return PriceHistory(symbol=symbol.upper(), candles=candles)
         except Exception:
             return PriceHistory(symbol=symbol.upper(), candles=[])
+
+    def get_dividend_history(self, symbol: str, years: int = 5) -> list:
+        """Return recent dividend history using yfinance Ticker.dividends
+
+        Returns list of dicts: [{'date': 'YYYY-MM-DD', 'amount': float}, ...]
+        """
+        try:
+            ticker = yf.Ticker(symbol)
+            divs = ticker.dividends
+            if divs is None or divs.empty:
+                return []
+            out = []
+            cutoff = datetime.utcnow().date().replace(year=datetime.utcnow().year - years)
+            for idx, amt in divs.items():
+                try:
+                    d = idx.to_pydatetime().date() if hasattr(idx, 'to_pydatetime') else idx
+                except Exception:
+                    d = idx
+                if isinstance(d, datetime):
+                    d = d.date()
+                if d < cutoff:
+                    continue
+                out.append({'date': d.isoformat(), 'amount': float(amt)})
+            out.sort(key=lambda x: x['date'], reverse=True)
+            return out
+        except Exception:
+            return []

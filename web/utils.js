@@ -234,6 +234,68 @@ function isMarketOpenNow() {
     return minutesSinceMidnight >= (9 * 60 + 30) && minutesSinceMidnight < (16 * 60);
 }
 
+// Initialize collapsible behavior for long sections in analysis cards
+function initCollapsibles() {
+    const sectionClasses = ['ownership-section', 'insider-section', 'dividend-section', 'peer-section'];
+    sectionClasses.forEach(cls => {
+        document.querySelectorAll('.' + cls).forEach(el => {
+            if (el.dataset.collapsible) return;
+            el.dataset.collapsible = '1';
+
+            const content = el.querySelector('table') || el.querySelector('ul') || el.querySelector('.section-body');
+            if (!content) return;
+
+            const wrapper = document.createElement('div');
+            wrapper.className = 'collapsible-body';
+            content.parentNode.insertBefore(wrapper, content);
+            wrapper.appendChild(content);
+
+            // If a `.section-toggle` already exists in the section HTML, reuse it in-place
+            // Do NOT move it (moving earlier caused the button to appear above the title).
+            let btn = el.querySelector('.section-toggle');
+            let createdByClient = false;
+            if (!btn) {
+                btn = document.createElement('button');
+                btn.className = 'section-toggle';
+                btn.type = 'button';
+                btn.textContent = 'Show more ▼';
+                // Insert the client-side button before the wrapper only when server didn't provide one
+                el.insertBefore(btn, wrapper);
+                createdByClient = true;
+            }
+
+            // Attach a single event listener to toggle the wrapper collapsed state
+            // Use a namespaced listener so re-initialization won't add duplicates
+            const handlerKey = '__collapsible_toggle_attached';
+            if (!btn[handlerKey]) {
+                btn.addEventListener('click', () => {
+                    const collapsed = wrapper.classList.toggle('collapsed');
+                    if (collapsed) {
+                        btn.textContent = 'Show more ▼';
+                    } else {
+                        btn.textContent = 'Show less ▲';
+                    }
+                });
+                btn[handlerKey] = true;
+            }
+
+            const rows = content.querySelectorAll('tr');
+            if (rows.length > 3) {
+                wrapper.classList.add('collapsed');
+                btn.style.display = '';
+                btn.textContent = 'Show more ▼';
+            } else {
+                // If the client created the button and preview is short, hide it.
+                // If the server rendered its own toggle (createdByClient === false), leave it alone so
+                // right-aligned server buttons remain visible and functional.
+                if (createdByClient) {
+                    btn.style.display = 'none';
+                }
+            }
+        });
+    });
+}
+
 // ===================================================================
 // Stock & Market Utilities
 // ===================================================================

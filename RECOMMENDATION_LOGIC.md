@@ -1,5 +1,7 @@
 # Recommendation Logic
 
+Last updated: 2026-05-17 — Commit-ready
+
 ## Current source of truth
 The live weights and label mapping are defined in `core/analysis/recommendation_engine.py`. This document explains the current scoring model used by the chat app and the comparison scripts.
 

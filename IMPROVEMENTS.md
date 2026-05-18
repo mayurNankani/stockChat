@@ -1,5 +1,7 @@
 # Improvements
 
+Last updated: 2026-05-17 — Commit-ready
+
 ## Current status
 The project now uses the agentic Flask flow in `web/`. The rich analysis card is built from `analysis_html`, and the backend has a fallback path so analysis-style queries still show the chart and heatmap even if the LLM skips tool calls.
 

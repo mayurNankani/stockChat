@@ -69,6 +69,18 @@ class StockRepository(IStockRepository):
         self.market_data = YahooFinanceAdapter()
         self.analysis_agent = StockAnalysisAgent()
         self.news_adapter = FinnhubNewsAdapter()
+        # New adapters
+        from adapters.market_data.yahoo_ownership_adapter import YahooOwnershipAdapter
+        from adapters.market_data.yahoo_insider_adapter import YahooInsiderAdapter
+        from adapters.market_data.yahoo_peer_adapter import YahooPeerAdapter
+        from adapters.market_data.finnhub_insider_adapter import FinnhubInsiderAdapter
+        from adapters.market_data.finnhub_dividend_adapter import FinnhubDividendAdapter
+        self.ownership_adapter = YahooOwnershipAdapter()
+        self.insider_adapter = YahooInsiderAdapter()
+        self.peer_adapter = YahooPeerAdapter()
+        self.fallback_insider_adapter = FinnhubInsiderAdapter()
+        self.fallback_dividend_adapter = FinnhubDividendAdapter()
+        # end of __init__ assignments
     
     def search_company(self, query: str) -> Optional[Dict[str, Any]]:
         """Search for company and return best match (transitional dict)."""
@@ -263,3 +275,58 @@ class StockRepository(IStockRepository):
         except Exception as e:
             print(f"Error fetching info for {ticker}: {e}")
             return {"error": str(e)}
+
+    # -------------------------
+    # New data access helpers
+    # -------------------------
+    def get_ownership_breakdown(self, ticker: str) -> dict:
+        """Get ownership breakdown (Yahoo primary)."""
+        try:
+            data = self.ownership_adapter.get_ownership_breakdown(ticker)
+            # Normalize to ensure callers always receive keys for rendering.
+            if not isinstance(data, dict):
+                return {'institutional': None, 'retail': None, 'insider': None}
+            return {
+                'institutional': data.get('institutional'),
+                'retail': data.get('retail'),
+                'insider': data.get('insider'),
+            }
+        except Exception:
+            return {"institutional": None, "retail": None, "insider": None}
+
+    def get_insider_transactions(self, ticker: str) -> list:
+        """Get insider transactions (Yahoo primary, Finnhub fallback)."""
+        try:
+            data = self.insider_adapter.get_insider_transactions(ticker)
+            if data:
+                return data
+        except Exception:
+            pass
+        # Fallback
+        try:
+            return self.fallback_insider_adapter.get_insider_transactions(ticker)
+        except Exception:
+            return []
+
+    def get_peer_comparison(self, ticker: str) -> list:
+        """Get peer comparison (Yahoo)."""
+        try:
+            return self.peer_adapter.get_peer_comparison(ticker)
+        except Exception:
+            return []
+
+    def get_dividend_history(self, ticker: str) -> list:
+        """Get dividend history (Yahoo via market_data, Finnhub fallback)."""
+        try:
+            # Try YahooFinanceAdapter if it supports dividend history
+            if hasattr(self.market_data, 'get_dividend_history'):
+                data = self.market_data.get_dividend_history(ticker)
+                if data:
+                    return data
+        except Exception:
+            pass
+        # Fallback
+        try:
+            return self.fallback_dividend_adapter.get_dividend_history(ticker)
+        except Exception:
+            return []

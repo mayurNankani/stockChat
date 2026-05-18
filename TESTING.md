@@ -1,5 +1,7 @@
 # Testing
 
+Last updated: 2026-05-17 — Commit-ready
+
 ## Current smoke tests
 ```bash
 source .venv/bin/activate

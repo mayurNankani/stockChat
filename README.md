@@ -1,5 +1,7 @@
 # tickerTalk
 
+Last updated: 2026-05-17 — Commit-ready
+
 ## Overview
 tickerTalk is a Flask chat app for stock analysis. A local LLM decides which tools to call, the tools fetch live market/news data, and the backend returns a rich analysis card with the chart, heatmap badges, news, and horizon recommendations.
 

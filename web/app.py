@@ -30,8 +30,9 @@ def create_app(config_object=None):
     Returns:
         Configured Flask application
     """
-    # Initialize Flask app
-    app = Flask(__name__, static_folder='.', static_url_path='')
+    # Initialize Flask app (serve frontend files from the web/ folder at /static/)
+    web_dir = os.path.abspath(os.path.dirname(__file__))
+    app = Flask(__name__, static_folder=web_dir, static_url_path='/static')
     
     # Load configuration
     if config_object is None:

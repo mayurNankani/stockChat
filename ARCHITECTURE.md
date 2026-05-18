@@ -1,5 +1,7 @@
 # tickerTalk — Architecture
 
+Last updated: 2026-05-17 — Commit-ready
+
 ## Current system overview
 tickerTalk is a Flask web app that runs a prompt-based agent loop. The LLM decides which tools to call, the tools fetch live stock data, and the backend returns a rich HTML analysis card plus a conversational reply.
 

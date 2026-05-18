@@ -395,6 +395,18 @@ class QueryService:
                     f"<b style='font-size:1.1em;color:#2563eb;'>{pe_ratio:.2f}</b>"
                     if isinstance(pe_ratio, (int, float)) else pe_ratio
                 )
+
+                try:
+                    ownership = self.repository.get_ownership_breakdown(ticker)
+                    if ownership and 'institutional' in ownership:
+                        inst = ownership.get('institutional', 'N/A')
+                        retail = ownership.get('retail', 'N/A')
+                        insider = ownership.get('insider', 'N/A')
+                        ownership_str = f"Institutional: {inst} | Retail: {retail} | Insider: {insider}"
+                    else:
+                        ownership_str = "N/A"
+                except Exception:
+                    ownership_str = "N/A"
                 return f"""
 <div style="margin:15px 0;padding:15px;background:#f0f9ff;border-left:4px solid #3b82f6;border-radius:6px;box-shadow:0 2px 4px rgba(0,0,0,0.1);">
     <div style="font-size:1.1em;margin-bottom:10px;"><b>{info.get('longName', ticker)} ({ticker})</b></div>
@@ -406,6 +418,7 @@ class QueryService:
         <div><b>Revenue:</b> {revenue}</div>
         <div><b>Profit Margin:</b> {profit_margin}</div>
         <div><b>Dividend Yield:</b> {dividend_yield}</div>
+        <div style="grid-column: span 2;"><b>Ownership Breakdown:</b> {ownership_str}</div>
     </div>
 </div>
 """

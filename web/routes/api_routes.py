@@ -70,8 +70,20 @@ def warm_market_overview_cache(stock_service: StockAnalysisService, cache_second
     try:
         overview = stock_service.get_market_overview()
         payload = _serialize_market_overview(overview)
-        market_overview_cache.set(cache_key, payload, ttl=normalized_cache_seconds)
-        return True
+        # Only set cache if payload contains at least one non-empty section
+        has_content = any(
+            payload.get(k) for k in ('movers', 'gainers', 'losers', 'most_active', 'indices')
+        )
+        if has_content:
+            market_overview_cache.set(cache_key, payload, ttl=normalized_cache_seconds)
+            return True
+        # Don't overwrite an existing cache with an empty payload
+        existing = market_overview_cache.get(cache_key)
+        if existing is not None:
+            return True
+        # No existing cache and new payload empty -> indicate failure
+        print("[WARN] Market overview warm-up returned empty payload")
+        return False
     except Exception as exc:
         print(f"[WARN] Market overview warm-up failed: {exc}")
         return False
@@ -147,23 +159,30 @@ def init_api_routes(stock_service: StockAnalysisService):
             resp.headers['Cache-Control'] = 'public, max-age=86400'
             return resp
 
+        import requests
         token = os.environ.get('FINNHUB_API_KEY', '')
-        url = f"https://finnhub.io/api/logo?symbol={symbol}&token={token}"
+        profile_url = f"https://finnhub.io/api/v1/stock/profile2?symbol={symbol}&token={token}"
         try:
-            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-            with urllib.request.urlopen(req, timeout=5) as r:
-                data = r.read()
-                ct = r.headers.get('Content-Type', 'image/png')
-                # Only cache and serve actual image bytes
-                if not ct.startswith('image/') and not ct.startswith('application/octet'):
-                    return '', 404
-                # Normalise generic octet-stream to png
-                if 'octet' in ct:
-                    ct = 'image/png'
-                _logo_cache.set(symbol, (data, ct))
-                resp = Response(data, status=200, mimetype=ct)
-                resp.headers['Cache-Control'] = 'public, max-age=86400'
-                return resp
+            resp_profile = requests.get(profile_url, timeout=5)
+            if resp_profile.status_code != 200:
+                return '', 404
+            profile = resp_profile.json()
+            logo_url = profile.get('logo')
+            if not logo_url:
+                return '', 404
+            # Now fetch the logo image itself
+            img_resp = requests.get(logo_url, timeout=5)
+            if img_resp.status_code != 200 or not img_resp.content:
+                return '', 404
+            ct = img_resp.headers.get('Content-Type', 'image/png')
+            if not ct.startswith('image/') and not ct.startswith('application/octet'):
+                return '', 404
+            if 'octet' in ct:
+                ct = 'image/png'
+            _logo_cache.set(symbol, (img_resp.content, ct))
+            resp = Response(img_resp.content, status=200, mimetype=ct)
+            resp.headers['Cache-Control'] = 'public, max-age=86400'
+            return resp
         except Exception:
             return '', 404
 
@@ -186,6 +205,23 @@ def init_api_routes(stock_service: StockAnalysisService):
                 return jsonify(refreshed)
 
             return jsonify({'error': 'Unable to fetch market overview right now'}), 503
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+    @api_bp.route('/health', methods=['GET'])
+    def health_check():
+        return jsonify({'status': 'ok'}), 200
+
+    @api_bp.route('/stock-info', methods=['GET'])
+    def get_stock_info():
+        """Return lightweight stock info (quote + ownership + optional extras)."""
+        try:
+            symbol = request.args.get('symbol', '')
+            if not symbol:
+                return jsonify({'error': 'symbol is required'}), 400
+
+            info = stock_service.get_stock_info(symbol.upper())
+            return jsonify(info)
         except Exception as e:
             return jsonify({'error': str(e)}), 500
 
